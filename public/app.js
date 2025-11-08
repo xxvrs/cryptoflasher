@@ -8,6 +8,7 @@ const transfersTableBody = document.querySelector('#transfers-table tbody');
 const transfers = new Map();
 
 let eventSource;
+let sessionEndedCleanly = false;
 
 function setStatus(text, variant = 'idle') {
   statusBadge.textContent = text;
@@ -166,6 +167,7 @@ async function submitForm(event) {
   resetTransfers();
   setStatus('Sending…', 'running');
   sendButton.disabled = true;
+  sessionEndedCleanly = false;
 
   const formData = new FormData(form);
   const payload = {};
@@ -220,6 +222,7 @@ async function submitForm(event) {
     };
 
     eventSource.addEventListener('end', () => {
+      sessionEndedCleanly = true;
       appendLog({ level: 'info', message: 'Session complete.' });
       setStatus('Idle', 'idle');
       sendButton.disabled = false;
@@ -227,6 +230,10 @@ async function submitForm(event) {
     });
 
     eventSource.onerror = () => {
+      if (sessionEndedCleanly) {
+        closeEventSource();
+        return;
+      }
       appendLog({ level: 'warn', message: 'Lost connection to server. Check the terminal for details.' });
       setStatus('Disconnected', 'error');
       sendButton.disabled = false;
