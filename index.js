@@ -1,0 +1,401 @@
+const path = require('path');
+const fs = require('fs');
+const { EventEmitter } = require('events');
+const { randomUUID } = require('crypto');
+const express = require('express');
+const { ethers } = require('ethers');
+require('dotenv').config();
+
+const PORT = process.env.PORT || 3000;
+const POLL_INTERVAL_MS = 5000;
+
+const abiPath = path.join(__dirname, 'abi.json');
+if (!fs.existsSync(abiPath)) {
+  console.error('Missing abi.json. Please ensure the ABI file is present.');
+  process.exit(1);
+}
+
+const erc20Abi = JSON.parse(fs.readFileSync(abiPath, 'utf8'));
+
+const app = express();
+app.use(express.json({ limit: '1mb' }));
+app.use(express.static(path.join(__dirname, 'public')));
+
+const sessions = new Map();
+
+function emitLog(session, level, message, meta = {}) {
+  const payload = { level, message, timestamp: new Date().toISOString(), meta };
+  session.buffer.push(payload);
+  session.emitter.emit('log', payload);
+}
+
+function extractRevertReason(error) {
+  const data = error?.error?.data ?? error?.data;
+  if (typeof data === 'string' && data.startsWith('0x08c379a0')) {
+    try {
+      const reasonHex = '0x' + data.slice(10);
+      const [reason] = ethers.utils.defaultAbiCoder.decode(['string'], reasonHex);
+      return reason;
+    } catch (decodeError) {
+      return `Failed to decode revert reason: ${decodeError.message}`;
+    }
+  }
+  if (typeof data === 'string') {
+    return `Reverted with data: ${data}`;
+  }
+  return error?.message ?? 'Transaction failed with an unknown error.';
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchRevertReason(provider, tx, blockNumber) {
+  try {
+    await provider.call({
+      to: tx.to,
+      from: tx.from,
+      data: tx.data,
+      gasPrice: tx.gasPrice,
+      gasLimit: tx.gasLimit,
+      value: tx.value,
+    }, blockNumber);
+  } catch (error) {
+    return extractRevertReason(error);
+  }
+  return null;
+}
+
+async function monitorTransaction(txResponse, provider, session, context = {}) {
+  const hash = txResponse.hash;
+  const { label = '', txIndex, id } = context;
+  const prefix = label ? `[${label}] ` : '';
+  const baseMeta = { ...context, txHash: hash };
+  let lastState = '';
+
+  emitLog(session, 'info', `${prefix}Monitoring transaction ${hash} ...`, {
+    ...baseMeta,
+    status: 'monitoring',
+  });
+
+  while (true) {
+    const receipt = await provider.getTransactionReceipt(hash);
+    if (receipt) {
+      if (receipt.status === 1) {
+        emitLog(
+          session,
+          'success',
+          `${prefix}✅ Transaction confirmed in block ${receipt.blockNumber}.`,
+          {
+            ...baseMeta,
+            status: 'confirmed',
+          }
+        );
+      } else {
+        emitLog(session, 'error', `${prefix}❌ Transaction was mined but reverted.`, {
+          ...baseMeta,
+          status: 'reverted',
+        });
+        const reason = await fetchRevertReason(provider, txResponse, receipt.blockNumber);
+        if (reason) {
+          emitLog(session, 'error', `${prefix}Revert reason: ${reason}`, {
+            ...baseMeta,
+            status: 'reverted',
+          });
+        }
+      }
+      emitLog(session, 'info', `${prefix}Gas used: ${receipt.gasUsed.toString()}`, {
+        ...baseMeta,
+      });
+      emitLog(session, 'info', `${prefix}View on Etherscan: https://etherscan.io/tx/${hash}`, {
+        ...baseMeta,
+      });
+      return;
+    }
+
+    const tx = await provider.getTransaction(hash);
+    if (!tx) {
+      if (lastState !== 'notfound') {
+        emitLog(
+          session,
+          'warn',
+          `${prefix}Transaction not yet found in mempool (it may still be propagating or was dropped).`,
+          {
+            ...baseMeta,
+            status: 'notfound',
+          }
+        );
+        lastState = 'notfound';
+      }
+    } else if (tx.blockNumber == null) {
+      if (lastState !== 'pending') {
+        emitLog(session, 'info', `${prefix}⏳ Transaction is still pending.`, {
+          ...baseMeta,
+          status: 'pending',
+        });
+        lastState = 'pending';
+      }
+    }
+
+    await delay(POLL_INTERVAL_MS);
+  }
+}
+
+function resolveConfig(body = {}) {
+  return {
+    rpcUrl: body.rpcUrl || process.env.RPC_URL,
+    privateKey: body.privateKey || process.env.PRIVATE_KEY,
+    tokenAddress: body.tokenAddress || process.env.TOKEN_ADDRESS,
+    recipient: body.recipient || process.env.RECIPIENT,
+    amount: body.amount || process.env.AMOUNT,
+    gasPriceGwei: body.gasPriceGwei || process.env.GAS_PRICE_GWEI,
+    gasLimit: body.gasLimit || process.env.GAS_LIMIT,
+    batchCount: body.batchCount || process.env.BATCH_COUNT,
+  };
+}
+
+function validateConfig(config) {
+  const missing = [];
+  if (!config.rpcUrl) missing.push('RPC_URL');
+  if (!config.privateKey) missing.push('PRIVATE_KEY');
+  if (!config.tokenAddress) missing.push('TOKEN_ADDRESS');
+  if (!config.recipient) missing.push('RECIPIENT');
+  if (!config.amount) missing.push('AMOUNT');
+  return missing;
+}
+
+async function runBatchTransfer(config, session) {
+  const missing = validateConfig(config);
+  if (missing.length > 0) {
+    emitLog(session, 'error', `Missing required configuration: ${missing.join(', ')}`);
+    return;
+  }
+
+  const batchCountRaw = config.batchCount ?? 1;
+  const batchCount = Number(batchCountRaw);
+  if (!Number.isFinite(batchCount) || !Number.isInteger(batchCount) || batchCount < 1) {
+    emitLog(
+      session,
+      'error',
+      `Invalid batch count "${batchCountRaw}". Provide a positive integer.`,
+      { status: 'invalid-batch' }
+    );
+    return;
+  }
+
+  emitLog(session, 'info', 'Initializing provider and wallet...');
+  let provider;
+  try {
+    provider = new ethers.providers.JsonRpcProvider(config.rpcUrl);
+  } catch (error) {
+    emitLog(session, 'error', `Failed to connect to RPC: ${error.message}`);
+    return;
+  }
+
+  let wallet;
+  try {
+    wallet = new ethers.Wallet(config.privateKey, provider);
+  } catch (error) {
+    emitLog(session, 'error', `Invalid private key: ${error.message}`);
+    return;
+  }
+
+  emitLog(session, 'info', `Using sender address: ${wallet.address}`);
+
+  const token = new ethers.Contract(config.tokenAddress, erc20Abi, wallet);
+
+  let symbol = 'token';
+  try {
+    symbol = await token.symbol();
+  } catch (error) {
+    emitLog(session, 'warn', 'Could not fetch token symbol; continuing.');
+  }
+
+  let decimals = 18;
+  try {
+    decimals = await token.decimals();
+  } catch (error) {
+    emitLog(session, 'warn', 'Could not fetch token decimals; defaulting to 18.');
+  }
+
+  let amount;
+  try {
+    amount = ethers.utils.parseUnits(config.amount.toString(), decimals);
+  } catch (error) {
+    emitLog(session, 'error', `Invalid amount: ${error.message}`);
+    return;
+  }
+
+  const baseOverrides = {};
+  if (config.gasPriceGwei) {
+    try {
+      baseOverrides.gasPrice = ethers.utils.parseUnits(config.gasPriceGwei.toString(), 'gwei');
+    } catch (error) {
+      emitLog(session, 'error', `Invalid gas price: ${error.message}`);
+      return;
+    }
+  }
+
+  if (!config.gasLimit) {
+    emitLog(
+      session,
+      'error',
+      'Gas limit is required. Provide a manual value via the dashboard or environment configuration.'
+    );
+    return;
+  }
+
+  let parsedGasLimit;
+  try {
+    parsedGasLimit = ethers.BigNumber.from(config.gasLimit);
+  } catch (error) {
+    emitLog(session, 'error', `Invalid gas limit: ${error.message}`);
+    return;
+  }
+
+  emitLog(
+    session,
+    'info',
+    `Preparing to fire ${batchCount} transfer${batchCount === 1 ? '' : 's'} with manual gas limit...`
+  );
+
+  const transferPromises = [];
+
+  for (let i = 0; i < batchCount; i += 1) {
+    const label = `Tx ${i + 1}/${batchCount}`;
+    const transferMeta = {
+      id: randomUUID(),
+      label,
+      txIndex: i,
+      status: 'preparing',
+    };
+
+    emitLog(session, 'info', `${label}: Preparing transfer.`, transferMeta);
+
+    const overrides = { ...baseOverrides, gasLimit: parsedGasLimit };
+
+    emitLog(
+      session,
+      'info',
+      `${label}: Broadcasting ${config.amount} ${symbol} to ${config.recipient}...`,
+      transferMeta
+    );
+    if (overrides.gasPrice) {
+      emitLog(
+        session,
+        'info',
+        `${label}: Custom gas price: ${ethers.utils.formatUnits(overrides.gasPrice, 'gwei')} gwei`,
+        transferMeta
+      );
+    }
+    emitLog(
+      session,
+      'info',
+      `${label}: Custom gas limit: ${overrides.gasLimit.toString()}`,
+      transferMeta
+    );
+
+    let txResponse;
+    try {
+      txResponse = await token.transfer(config.recipient, amount, overrides);
+    } catch (error) {
+      emitLog(
+        session,
+        'error',
+        `${label}: Failed to send transaction: ${error.message}`,
+        { ...transferMeta, status: 'error' }
+      );
+      continue;
+    }
+
+    const submittedMeta = { ...transferMeta, txHash: txResponse.hash, status: 'submitted' };
+    emitLog(
+      session,
+      'success',
+      `${label}: Transaction submitted. Hash: ${txResponse.hash}`,
+      submittedMeta
+    );
+    emitLog(
+      session,
+      'info',
+      `${label}: Track on Etherscan: https://etherscan.io/tx/${txResponse.hash}`,
+      submittedMeta
+    );
+
+    const monitorPromise = monitorTransaction(txResponse, provider, session, submittedMeta).catch((error) => {
+      emitLog(
+        session,
+        'error',
+        `${label}: Error while monitoring transaction: ${error.message}`,
+        { ...submittedMeta, status: 'error' }
+      );
+    });
+
+    transferPromises.push(monitorPromise);
+  }
+
+  if (transferPromises.length === 0) {
+    emitLog(session, 'error', 'No transfers were submitted. Resolve the errors above and try again.');
+    return;
+  }
+
+  await Promise.allSettled(transferPromises);
+  emitLog(session, 'info', 'All transfer monitors finished.');
+}
+
+app.post('/api/send', (req, res) => {
+  const sessionId = randomUUID();
+  const session = { emitter: new EventEmitter(), buffer: [] };
+  sessions.set(sessionId, session);
+  res.json({ sessionId });
+
+  runBatchTransfer(resolveConfig(req.body), session)
+    .catch((error) => {
+      emitLog(session, 'error', `Unexpected error: ${error.message}`);
+    })
+    .finally(() => {
+      session.emitter.emit('end');
+      sessions.delete(sessionId);
+    });
+});
+
+app.get('/api/events/:sessionId', (req, res) => {
+  const { sessionId } = req.params;
+  const session = sessions.get(sessionId);
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+
+  if (!session) {
+    res.write(`event: error\ndata: ${JSON.stringify({ message: 'Session not found.' })}\n\n`);
+    res.write('event: end\ndata: {}\n\n');
+    res.end();
+    return;
+  }
+
+  session.buffer.forEach((payload) => {
+    res.write(`data: ${JSON.stringify(payload)}\n\n`);
+  });
+
+  const onLog = (payload) => {
+    res.write(`data: ${JSON.stringify(payload)}\n\n`);
+  };
+
+  const onEnd = () => {
+    res.write('event: end\ndata: {}\n\n');
+    res.end();
+  };
+
+  session.emitter.on('log', onLog);
+  session.emitter.once('end', onEnd);
+
+  req.on('close', () => {
+    session.emitter.off('log', onLog);
+  });
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+  console.log('Open your browser to load the ERC20 transfer dashboard.');
+});
