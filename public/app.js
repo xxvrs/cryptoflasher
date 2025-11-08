@@ -217,6 +217,15 @@ async function submitForm(event) {
         } else if (status === 'confirmed') {
           setStatus('Confirmed', 'idle');
         }
+        if (payload.level === 'success' && payload.message.includes('Transaction submitted')) {
+          setStatus('Pending…', 'running');
+        }
+        if (payload.level === 'success' && payload.message.includes('confirmed')) {
+          setStatus('Confirmed', 'idle');
+        }
+        if (payload.level === 'error') {
+          setStatus('Error', 'error');
+        }
       } catch (error) {
         appendLog({ level: 'error', message: `Failed to parse server message: ${error.message}` });
         setStatus('Error', 'error');
