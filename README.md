@@ -5,9 +5,6 @@ control on Ethereum mainnet, then watch the live status of each transaction (pen
 reverted). It is intended for controlled experiments with your own addresses. You can now supply the
 exact gas limit used for each transfer so you can explore different outcomes — including deliberate
 failures when you set the limit too low.
-reverted). It is intended for controlled experiments with your own addresses. The current build
-intentionally underfunds every transaction with too little gas so each transfer is mined and then
-reverts, letting you study guaranteed failure behavior without adjusting settings manually.
 
 ## Prerequisites
 
@@ -52,8 +49,6 @@ reverts, letting you study guaranteed failure behavior without adjusting setting
    - **Gas price (optional)** – override the gas price used for every submitted transaction.
    - **Gas limit** – required manual gas limit for each transfer. Choose a value low enough to force
      a revert or high enough to allow success depending on the behavior you want to observe.
-   - **Gas price (optional)** – you can still supply a custom gas price, but the app will override
-     the gas limit to ensure the transaction fails.
 
 4. Click **Send Transfer**. Keep the page open while the transaction processes. The live console will
    show:
@@ -71,5 +66,3 @@ reverts, letting you study guaranteed failure behavior without adjusting setting
 - Store the `.env` file securely; do not commit it to version control or share it publicly.
 - Selecting a gas limit that is too low will cause transactions to run out of gas and revert. Pick a
   value that matches the behavior you intend to study and budget for the gas that will be consumed.
-- The dashboard now always forces a revert by capping the gas limit below the required amount. Be
-  prepared for each broadcast to fail and burn the associated gas fee.
