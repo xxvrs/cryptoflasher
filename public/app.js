@@ -207,6 +207,7 @@ async function submitForm(event) {
         updateTransferFromMeta(payload.meta, payload.message, payload.timestamp);
 
         const status = payload.meta?.status;
+        if (status && ['preparing', 'submitted', 'monitoring', 'pending', 'notfound'].includes(status)) {
         if (
           status &&
           ['preparing', 'forcing-failure', 'submitted', 'monitoring', 'pending', 'notfound'].includes(status)

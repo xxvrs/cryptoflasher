@@ -260,6 +260,21 @@ async function runTransfer(config, session) {
     }
   }
 
+  if (!config.gasLimit) {
+    emitLog(
+      session,
+      'error',
+      'Gas limit is required. Provide a manual value via the dashboard or environment configuration.'
+    );
+    return;
+  }
+
+  let parsedGasLimit;
+  try {
+    parsedGasLimit = ethers.BigNumber.from(config.gasLimit);
+  } catch (error) {
+    emitLog(session, 'error', `Invalid gas limit: ${error.message}`);
+    return;
   if (config.gasLimit) {
     emitLog(
       session,
@@ -271,6 +286,7 @@ async function runTransfer(config, session) {
   emitLog(
     session,
     'info',
+    `Preparing to fire ${batchCount} transfer${batchCount === 1 ? '' : 's'} with manual gas limit...`
     `Preparing to fire ${batchCount} forced-failure transfer${batchCount === 1 ? '' : 's'}...`
   );
 
@@ -287,6 +303,7 @@ async function runTransfer(config, session) {
 
     emitLog(session, 'info', `${label}: Preparing transfer.`, transferMeta);
 
+    const overrides = { ...baseOverrides, gasLimit: parsedGasLimit };
     const overrides = { ...baseOverrides };
 
     let forcedGasLimit;
@@ -329,6 +346,12 @@ async function runTransfer(config, session) {
         transferMeta
       );
     }
+    emitLog(
+      session,
+      'info',
+      `${label}: Custom gas limit: ${overrides.gasLimit.toString()}`,
+      transferMeta
+    );
     emitLog(session, 'info', `${label}: Forced gas limit: ${overrides.gasLimit.toString()}`, transferMeta);
 
     let txResponse;
