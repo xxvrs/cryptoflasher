@@ -213,7 +213,7 @@ async function runTransfer(config, session) {
       `Intentionally setting gas limit to ${forcedGasLimit.toString()} (below estimated ${estimatedGas.toString()}) to guarantee failure.`
     );
   } catch (error) {
-    forcedGasLimit = ethers.BigNumber.from(21000);
+    forcedGasLimit = ethers.BigNumber.from(45000);
     emitLog(
       session,
       'warn',
