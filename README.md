@@ -49,7 +49,8 @@ reverts, letting you study guaranteed failure behavior without adjusting setting
 
 4. Click **Send Transfer**. Keep the page open while the transaction processes. The live console will
    show:
-   - The submitted transaction hash.
+   - The submitted transaction hash and a clickable Etherscan link as soon as the transaction is
+     broadcast.
    - Whether the tx is pending, not yet seen in the mempool, confirmed, or reverted.
    - Revert reasons (when available) and basic receipt data such as block number and gas usage.
 

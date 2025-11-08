@@ -176,6 +176,17 @@ button.secondary {
   color: #4ade80;
 }
 
+.console .entry a {
+  color: #93c5fd;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+.console .entry a:hover,
+.console .entry a:focus {
+  color: #bfdbfe;
+}
+
 .notice {
   font-size: 0.95rem;
   color: rgba(226, 232, 240, 0.85);

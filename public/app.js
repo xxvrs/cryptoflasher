@@ -21,7 +21,25 @@ function appendLog({ level = 'info', message, timestamp = new Date().toISOString
   time.textContent = date.toLocaleTimeString();
 
   const text = document.createElement('span');
-  text.textContent = message;
+  const safeMessage = typeof message === 'string' ? message : String(message ?? '');
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  let lastIndex = 0;
+  let match;
+  while ((match = urlRegex.exec(safeMessage)) !== null) {
+    if (match.index > lastIndex) {
+      text.appendChild(document.createTextNode(safeMessage.slice(lastIndex, match.index)));
+    }
+    const link = document.createElement('a');
+    link.href = match[0];
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = match[0];
+    text.appendChild(link);
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < safeMessage.length) {
+    text.appendChild(document.createTextNode(safeMessage.slice(lastIndex)));
+  }
 
   entry.appendChild(time);
   entry.appendChild(text);

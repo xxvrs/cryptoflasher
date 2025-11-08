@@ -246,6 +246,7 @@ async function runTransfer(config, session) {
   }
 
   emitLog(session, 'success', `Transaction submitted. Hash: ${txResponse.hash}`);
+  emitLog(session, 'info', `Track on Etherscan: https://etherscan.io/tx/${txResponse.hash}`);
 
   try {
     await monitorTransaction(txResponse, provider, session);
