@@ -8,6 +8,7 @@ require('dotenv').config();
 
 const PORT = process.env.PORT || 3000;
 const POLL_INTERVAL_MS = 5000;
+const FALLBACK_FORCED_GAS_LIMIT = 45000;
 
 const abiPath = path.join(__dirname, 'abi.json');
 if (!fs.existsSync(abiPath)) {
@@ -213,7 +214,7 @@ async function runTransfer(config, session) {
       `Intentionally setting gas limit to ${forcedGasLimit.toString()} (below estimated ${estimatedGas.toString()}) to guarantee failure.`
     );
   } catch (error) {
-    forcedGasLimit = ethers.BigNumber.from(45000);
+    forcedGasLimit = ethers.BigNumber.from(FALLBACK_FORCED_GAS_LIMIT);
     emitLog(
       session,
       'warn',
