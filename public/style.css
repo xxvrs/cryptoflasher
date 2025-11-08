@@ -196,6 +196,80 @@ button.secondary {
   padding-left: 1.2rem;
 }
 
+.table-wrapper {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 520px;
+  font-size: 0.95rem;
+}
+
+thead th {
+  text-align: left;
+  font-weight: 600;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+tbody td {
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+tbody tr:nth-child(even) {
+  background: rgba(15, 23, 42, 0.35);
+}
+
+tbody td a {
+  color: #93c5fd;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+tbody td a:hover,
+tbody td a:focus {
+  color: #bfdbfe;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.2);
+  color: #e2e8f0;
+  font-size: 0.85rem;
+}
+
+.status-pill.status-preparing,
+.status-pill.status-forcing-failure,
+.status-pill.status-submitted,
+.status-pill.status-monitoring,
+.status-pill.status-pending,
+.status-pill.status-notfound {
+  background: rgba(59, 130, 246, 0.25);
+  color: #bfdbfe;
+}
+
+.status-pill.status-reverted,
+.status-pill.status-error,
+.status-pill.status-invalid-batch {
+  background: rgba(248, 113, 113, 0.25);
+  color: #fecaca;
+}
+
+.status-pill.status-confirmed {
+  background: rgba(74, 222, 128, 0.25);
+  color: #bbf7d0;
+}
+
 @media (max-width: 600px) {
   main.container {
     padding: 1.5rem 1rem 3rem;

@@ -44,6 +44,8 @@ reverts, letting you study guaranteed failure behavior without adjusting setting
    - **Recipient Address** – destination wallet you also control.
    - **Amount (whole units)** – the amount you wish to send. The app fetches token decimals and
      converts for you.
+   - **Number of transfers** – optional batch size. Each submission replays the transfer this many
+     times and monitors them concurrently.
    - **Gas price (optional)** – you can still supply a custom gas price, but the app will override
      the gas limit to ensure the transaction fails.
 
@@ -53,6 +55,8 @@ reverts, letting you study guaranteed failure behavior without adjusting setting
      broadcast.
    - Whether the tx is pending, not yet seen in the mempool, confirmed, or reverted.
    - Revert reasons (when available) and basic receipt data such as block number and gas usage.
+   - A summary table beneath the console that lists every in-flight transaction hash alongside its
+     latest status so you can track multiple attempts at once.
 
 ## Safety notes
 

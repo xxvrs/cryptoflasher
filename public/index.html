@@ -73,6 +73,18 @@
             </label>
 
             <label class="field">
+              <span>Number of transfers</span>
+              <input
+                name="batchCount"
+                type="number"
+                min="1"
+                step="1"
+                placeholder="1"
+              />
+              <small>Each send replays the transfer this many times in parallel monitoring.</small>
+            </label>
+
+            <label class="field">
               <span>Gas Price (gwei, optional)</span>
               <input name="gasPriceGwei" type="number" step="any" min="0" />
               <small>The server ignores custom gas limits and sets them too low to force failure.</small>
@@ -92,6 +104,25 @@
           <span id="session-status" class="status">Idle</span>
         </header>
         <pre id="log-output" class="console" aria-live="polite"></pre>
+      </section>
+
+      <section class="card">
+        <header class="card-header">
+          <h2>Active Transfers</h2>
+        </header>
+        <div class="table-wrapper">
+          <table id="transfers-table">
+            <thead>
+              <tr>
+                <th scope="col">Label</th>
+                <th scope="col">Transaction</th>
+                <th scope="col">Status</th>
+                <th scope="col">Last update</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </section>
 
       <section class="notice">

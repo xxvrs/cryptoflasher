@@ -3,6 +3,9 @@ const logOutput = document.getElementById('log-output');
 const statusBadge = document.getElementById('session-status');
 const sendButton = document.getElementById('send-button');
 const clearButton = document.getElementById('clear-console');
+const transfersTableBody = document.querySelector('#transfers-table tbody');
+
+const transfers = new Map();
 
 let eventSource;
 
@@ -51,6 +54,105 @@ function clearLogs() {
   logOutput.innerHTML = '';
 }
 
+function formatStatus(status) {
+  const labels = {
+    preparing: 'Preparing',
+    'forcing-failure': 'Forcing failure',
+    submitted: 'Submitted',
+    monitoring: 'Monitoring',
+    pending: 'Pending',
+    notfound: 'Not yet in mempool',
+    confirmed: 'Confirmed',
+    reverted: 'Reverted',
+    error: 'Error',
+    'invalid-batch': 'Invalid batch size',
+  };
+  return labels[status] || (status ? status : 'Unknown');
+}
+
+function renderTransfersTable() {
+  if (!transfersTableBody) return;
+  transfersTableBody.innerHTML = '';
+
+  if (transfers.size === 0) {
+    const row = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.colSpan = 4;
+    cell.textContent = 'No transfers yet.';
+    row.appendChild(cell);
+    transfersTableBody.appendChild(row);
+    return;
+  }
+
+  const rows = Array.from(transfers.values()).sort((a, b) => a.createdAt - b.createdAt);
+
+  rows.forEach((transfer) => {
+    const row = document.createElement('tr');
+
+    const labelCell = document.createElement('td');
+    labelCell.textContent = transfer.label || `Tx ${transfer.txIndex + 1}`;
+    row.appendChild(labelCell);
+
+    const hashCell = document.createElement('td');
+    if (transfer.txHash) {
+      const link = document.createElement('a');
+      link.href = `https://etherscan.io/tx/${transfer.txHash}`;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = transfer.txHash;
+      hashCell.appendChild(link);
+    } else {
+      hashCell.textContent = '—';
+    }
+    row.appendChild(hashCell);
+
+    const statusCell = document.createElement('td');
+    const statusPill = document.createElement('span');
+    statusPill.className = `status-pill status-${transfer.status || 'unknown'}`;
+    statusPill.textContent = formatStatus(transfer.status);
+    statusCell.appendChild(statusPill);
+    row.appendChild(statusCell);
+
+    const updatedCell = document.createElement('td');
+    const updated = transfer.updatedAt ? new Date(transfer.updatedAt) : new Date();
+    updatedCell.textContent = updated.toLocaleTimeString();
+    row.appendChild(updatedCell);
+
+    transfersTableBody.appendChild(row);
+  });
+}
+
+function resetTransfers() {
+  transfers.clear();
+  renderTransfersTable();
+}
+
+function updateTransferFromMeta(meta = {}, message, timestamp) {
+  if (!meta.id) {
+    return;
+  }
+
+  const existing = transfers.get(meta.id) || {
+    id: meta.id,
+    createdAt: Date.now(),
+    txIndex: meta.txIndex,
+  };
+
+  existing.label = meta.label || existing.label;
+  existing.txIndex = typeof meta.txIndex === 'number' ? meta.txIndex : existing.txIndex;
+  if (meta.txHash) {
+    existing.txHash = meta.txHash;
+  }
+  if (meta.status) {
+    existing.status = meta.status;
+  }
+  existing.lastMessage = message || existing.lastMessage;
+  existing.updatedAt = timestamp || new Date().toISOString();
+
+  transfers.set(meta.id, existing);
+  renderTransfersTable();
+}
+
 function closeEventSource() {
   if (eventSource) {
     eventSource.close();
@@ -62,6 +164,7 @@ async function submitForm(event) {
   event.preventDefault();
   closeEventSource();
   clearLogs();
+  resetTransfers();
   setStatus('Sending…', 'running');
   sendButton.disabled = true;
 
@@ -101,6 +204,19 @@ async function submitForm(event) {
       try {
         const payload = JSON.parse(event.data);
         appendLog(payload);
+        updateTransferFromMeta(payload.meta, payload.message, payload.timestamp);
+
+        const status = payload.meta?.status;
+        if (
+          status &&
+          ['preparing', 'forcing-failure', 'submitted', 'monitoring', 'pending', 'notfound'].includes(status)
+        ) {
+          setStatus('Running…', 'running');
+        } else if (status && ['reverted', 'error', 'invalid-batch'].includes(status)) {
+          setStatus('Failed', 'error');
+        } else if (status === 'confirmed') {
+          setStatus('Confirmed', 'idle');
+        }
         if (payload.level === 'success' && payload.message.includes('Transaction submitted')) {
           setStatus('Pending…', 'running');
         }
@@ -148,3 +264,4 @@ appendLog({
     'Ready. Fill in the form with your mainnet configuration. Values left blank fall back to the server .env file.',
 });
 setStatus('Idle', 'idle');
+renderTransfersTable();
