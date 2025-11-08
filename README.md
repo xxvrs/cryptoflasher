@@ -2,8 +2,9 @@
 
 This project runs a local web dashboard that helps you submit ERC20 transfers between wallets you
 control on Ethereum mainnet, then watch the live status of each transaction (pending, confirmed, or
-reverted). It is intended for controlled experiments with your own addresses — the tool does not
-spam or attack other users, and it will not intentionally force failures.
+reverted). It is intended for controlled experiments with your own addresses. The current build
+intentionally underfunds every transaction with too little gas so each transfer is mined and then
+reverts, letting you study guaranteed failure behavior without adjusting settings manually.
 
 ## Prerequisites
 
@@ -43,8 +44,8 @@ spam or attack other users, and it will not intentionally force failures.
    - **Recipient Address** – destination wallet you also control.
    - **Amount (whole units)** – the amount you wish to send. The app fetches token decimals and
      converts for you.
-   - **Optional gas overrides** – experiment with gas price and gas limit to reproduce pending or
-     reverted behavior.
+   - **Gas price (optional)** – you can still supply a custom gas price, but the app will override
+     the gas limit to ensure the transaction fails.
 
 4. Click **Send Transfer**. Keep the page open while the transaction processes. The live console will
    show:
@@ -57,5 +58,5 @@ spam or attack other users, and it will not intentionally force failures.
 - Only use wallets and tokens that you own and control.
 - Double-check token amounts and gas settings before broadcasting to mainnet.
 - Store the `.env` file securely; do not commit it to version control or share it publicly.
-- The tool does **not** automatically cause failures. To study edge cases, adjust gas price/limit or
-  token logic responsibly.
+- The dashboard now always forces a revert by capping the gas limit below the required amount. Be
+  prepared for each broadcast to fail and burn the associated gas fee.

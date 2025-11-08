@@ -91,6 +91,11 @@ form .grid {
   font-size: 1rem;
 }
 
+.field small {
+  color: rgba(148, 163, 184, 0.8);
+  font-size: 0.8rem;
+}
+
 .field input:focus {
   outline: 2px solid rgba(59, 130, 246, 0.7);
   border-color: rgba(59, 130, 246, 0.8);

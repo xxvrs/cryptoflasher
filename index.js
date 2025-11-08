@@ -190,14 +190,38 @@ async function runTransfer(config, session) {
       return;
     }
   }
+
   if (config.gasLimit) {
-    try {
-      overrides.gasLimit = ethers.BigNumber.from(config.gasLimit);
-    } catch (error) {
-      emitLog(session, 'error', `Invalid gas limit: ${error.message}`);
-      return;
-    }
+    emitLog(
+      session,
+      'warn',
+      'Ignoring provided gas limit — the dashboard intentionally underfunds gas to force a revert.'
+    );
   }
+
+  let forcedGasLimit;
+  try {
+    const estimatedGas = await token.estimateGas.transfer(config.recipient, amount, overrides);
+    if (estimatedGas.gt(1)) {
+      forcedGasLimit = estimatedGas.sub(1);
+    } else {
+      forcedGasLimit = ethers.BigNumber.from(1);
+    }
+    emitLog(
+      session,
+      'warn',
+      `Intentionally setting gas limit to ${forcedGasLimit.toString()} (below estimated ${estimatedGas.toString()}) to guarantee failure.`
+    );
+  } catch (error) {
+    forcedGasLimit = ethers.BigNumber.from(21000);
+    emitLog(
+      session,
+      'warn',
+      `Gas estimation failed (${error.message}). Falling back to minimal gas limit ${forcedGasLimit.toString()} to trigger failure.`
+    );
+  }
+
+  overrides.gasLimit = forcedGasLimit;
 
   emitLog(
     session,
@@ -211,9 +235,7 @@ async function runTransfer(config, session) {
       `Custom gas price: ${ethers.utils.formatUnits(overrides.gasPrice, 'gwei')} gwei`
     );
   }
-  if (overrides.gasLimit) {
-    emitLog(session, 'info', `Custom gas limit: ${overrides.gasLimit.toString()}`);
-  }
+  emitLog(session, 'info', `Forced gas limit: ${overrides.gasLimit.toString()}`);
 
   let txResponse;
   try {

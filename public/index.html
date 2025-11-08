@@ -9,11 +9,11 @@
   <body>
     <main class="container">
       <header>
-        <h1>ERC20 Transfer Monitor</h1>
+        <h1>ERC20 Failure Monitor</h1>
         <p>
-          Run transfers between wallets you control, then watch the live transaction status
-          on Ethereum mainnet. Fill in your configuration, click <strong>Send</strong>,
-          and keep this window open while the transaction processes.
+          Run transfers between wallets you control, then watch how they inevitably revert on
+          Ethereum mainnet. The dashboard deliberately underfunds gas so every transaction fails,
+          helping you inspect pending and revert states in a controlled way.
         </p>
       </header>
 
@@ -75,11 +75,7 @@
             <label class="field">
               <span>Gas Price (gwei, optional)</span>
               <input name="gasPriceGwei" type="number" step="any" min="0" />
-            </label>
-
-            <label class="field">
-              <span>Gas Limit (optional)</span>
-              <input name="gasLimit" type="number" step="1" min="21000" />
+              <small>The server ignores custom gas limits and sets them too low to force failure.</small>
             </label>
           </div>
 
@@ -103,10 +99,7 @@
         <ul>
           <li>Only use wallets and tokens that you control.</li>
           <li>Double-check amounts and gas settings before sending to mainnet.</li>
-          <li>
-            The tool does not force a failure — experiment carefully with gas overrides if you
-            want to study pending or reverted transactions.
-          </li>
+          <li>The server always underfunds gas so every transfer reverts. Expect the tx to fail.</li>
         </ul>
       </section>
     </main>
