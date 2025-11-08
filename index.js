@@ -399,23 +399,3 @@ app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   console.log('Open your browser to load the ERC20 transfer dashboard.');
 });
-package.json
-New
-+15
--0
-
-{
-  "name": "cryptoflasher",
-  "version": "1.0.0",
-  "description": "Ethereum mainnet ERC20 transfer dashboard",
-  "main": "index.js",
-  "type": "commonjs",
-  "scripts": {
-    "start": "node index.js"
-  },
-  "dependencies": {
-    "dotenv": "^16.4.5",
-    "ethers": "^5.7.2",
-    "express": "^4.19.2"
-  }
-}
