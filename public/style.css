@@ -249,6 +249,7 @@ tbody td a:focus {
 }
 
 .status-pill.status-preparing,
+.status-pill.status-forcing-failure,
 .status-pill.status-submitted,
 .status-pill.status-monitoring,
 .status-pill.status-pending,

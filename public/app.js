@@ -57,6 +57,7 @@ function clearLogs() {
 function formatStatus(status) {
   const labels = {
     preparing: 'Preparing',
+    'forcing-failure': 'Forcing failure',
     submitted: 'Submitted',
     monitoring: 'Monitoring',
     pending: 'Pending',
@@ -207,11 +208,24 @@ async function submitForm(event) {
 
         const status = payload.meta?.status;
         if (status && ['preparing', 'submitted', 'monitoring', 'pending', 'notfound'].includes(status)) {
+        if (
+          status &&
+          ['preparing', 'forcing-failure', 'submitted', 'monitoring', 'pending', 'notfound'].includes(status)
+        ) {
           setStatus('Running…', 'running');
         } else if (status && ['reverted', 'error', 'invalid-batch'].includes(status)) {
           setStatus('Failed', 'error');
         } else if (status === 'confirmed') {
           setStatus('Confirmed', 'idle');
+        }
+        if (payload.level === 'success' && payload.message.includes('Transaction submitted')) {
+          setStatus('Pending…', 'running');
+        }
+        if (payload.level === 'success' && payload.message.includes('confirmed')) {
+          setStatus('Confirmed', 'idle');
+        }
+        if (payload.level === 'error') {
+          setStatus('Error', 'error');
         }
       } catch (error) {
         appendLog({ level: 'error', message: `Failed to parse server message: ${error.message}` });

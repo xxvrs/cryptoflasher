@@ -14,6 +14,11 @@
           Run transfers between wallets you control, then watch their lifecycle on Ethereum mainnet.
           Supply your own gas limit to explore how pending, confirmed, or reverted outcomes behave in
           real time.
+        <h1>ERC20 Failure Monitor</h1>
+        <p>
+          Run transfers between wallets you control, then watch how they inevitably revert on
+          Ethereum mainnet. The dashboard deliberately underfunds gas so every transaction fails,
+          helping you inspect pending and revert states in a controlled way.
         </p>
       </header>
 
@@ -94,6 +99,7 @@
               <span>Gas Limit</span>
               <input name="gasLimit" type="number" min="1" step="1" placeholder="45000" />
               <small>Choose a manual gas limit. Low limits can force a revert; higher limits may allow success.</small>
+              <small>The server ignores custom gas limits and sets them too low to force failure.</small>
             </label>
           </div>
 
@@ -137,6 +143,7 @@
           <li>Only use wallets and tokens that you control.</li>
           <li>Double-check amounts and gas settings before sending to mainnet.</li>
           <li>Low gas limits will trigger out-of-gas reverts. Pick values that match your experiment.</li>
+          <li>The server always underfunds gas so every transfer reverts. Expect the tx to fail.</li>
         </ul>
       </section>
     </main>
